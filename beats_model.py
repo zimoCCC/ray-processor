@@ -29,10 +29,13 @@ class BEATsModel(BaseModel):
     
     def _load_model(self):
         """加载BEATs模型"""
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), 'beats'))
         from BEATs import BEATs, BEATsConfig
         
         # 加载checkpoint
-        checkpoint = torch.load(self.model_path, map_location=self.device)
+        checkpoint = torch.load(self.model_path)
         
         # 创建模型
         cfg = BEATsConfig(checkpoint['cfg'])

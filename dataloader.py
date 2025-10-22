@@ -107,6 +107,8 @@ class AudioJSONLDataLoader(BaseDataLoader):
                     item = json.loads(line)
                     # 确保有audio_path字段
                     if 'audio_path' not in item:
+                        if 'prompt' in item:
+                            item['audio_path'] = item['prompt']
                         if 'path' in item:
                             item['audio_path'] = item['path']
                         elif 'file' in item:
