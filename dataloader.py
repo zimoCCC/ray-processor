@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 class BaseDataLoader(ABC):
     """
     基础数据加载器类
+    提供通用的数据访问和断点续跑支持
     """
     
     def __init__(self, 
@@ -35,6 +36,8 @@ class BaseDataLoader(ABC):
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.config = kwargs
+        self.data = []  # 数据存储
+        self._current_position = 0  # 当前位置
         
         logger.info(f"Initializing DataLoader with path: {data_path}")
         self._load_data()
@@ -49,10 +52,9 @@ class BaseDataLoader(ABC):
         """迭代器，返回批次数据"""
         pass
     
-    @abstractmethod
     def __len__(self) -> int:
         """返回数据总数"""
-        pass
+        return len(self.data)
     
     def get_batch(self, start_idx: int, end_idx: int) -> List[Dict[str, Any]]:
         """
@@ -66,6 +68,57 @@ class BaseDataLoader(ABC):
             数据批次
         """
         return self.data[start_idx:end_idx]
+    
+    def set_position(self, position: int):
+        """
+        设置数据加载器的位置（用于断点续跑）
+        
+        Args:
+            position: 位置索引
+        """
+        if position < 0 or position >= len(self.data):
+            raise IndexError(f"Position {position} out of range [0, {len(self.data)})")
+        self._current_position = position
+    
+    def get_item(self, index: int) -> Dict[str, Any]:
+        """
+        根据索引获取单个数据项
+        
+        Args:
+            index: 数据索引
+            
+        Returns:
+            数据项
+        """
+        if index < 0 or index >= len(self.data):
+            raise IndexError(f"Index {index} out of range [0, {len(self.data)})")
+        return self.data[index]
+    
+    def get_batch_by_indices(self, indices: List[int]) -> List[Dict[str, Any]]:
+        """
+        根据索引列表获取数据批次
+        
+        Args:
+            indices: 索引列表
+            
+        Returns:
+            数据批次
+        """
+        batch = []
+        for idx in indices:
+            if 0 <= idx < len(self.data):
+                batch.append(self.data[idx])
+            else:
+                logger.warning(f"Index {idx} out of range, skipping")
+        return batch
+    
+    def get_current_position(self) -> int:
+        """获取当前位置"""
+        return self._current_position
+    
+    def reset_position(self):
+        """重置位置到开始"""
+        self._current_position = 0
 
 
 class JSONLDataLoader(BaseDataLoader):
@@ -133,9 +186,7 @@ class AudioJSONLDataLoader(BaseDataLoader):
             batch = [self.data[idx] for idx in batch_indices]
             yield batch
     
-    def __len__(self) -> int:
-        """返回数据总数"""
-        return len(self.data)
+    # 继承基类的所有通用方法，无需重复实现
 
 
 if __name__ == "__main__":
