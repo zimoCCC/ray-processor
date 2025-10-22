@@ -2,6 +2,7 @@
 Ray Model Worker
 简化的模型工作器，只需要继承基础模型类即可
 """
+
 import logging
 from typing import Any, Dict, List, Union
 
