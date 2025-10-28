@@ -14,8 +14,8 @@ import ray
 from tqdm import tqdm
 
 from dataloader import AudioJSONLDataLoader
-from model_worker import create_beats_worker
-from models import BEATsModel
+from model_worker import create_qwen3omni_worker
+from models import Qwen3OmniModel
 from task_tracker import TaskTracker
 
 
@@ -59,15 +59,22 @@ def save_batch(batch_results, output_path):
             f.write(json.dumps(result, ensure_ascii=False) + '\n')
 
 
-def run_inference(data_path, output_path, num_gpus=2, batch_size=4, model_path=None, db_path=None, enable_sqlite=True):
+def run_inference(data_path, output_path, num_gpus=2, batch_size=80, model_path=None, db_path=None, enable_sqlite=True):
     """运行分布式推理"""
 
-    # 计算worker数量
-    gpu_per_worker = 0.1  # 每个worker占用的GPU数
-    num_workers = int(num_gpus / gpu_per_worker)
-
     # 初始化Ray
-    ray.init(num_gpus=num_gpus)
+    ray.init()
+    
+    # 计算worker数量
+    gpu_per_worker = 1  # 每个worker占用的GPU数（Qwen3-Omni建议整卡）
+    available_resources = ray.available_resources()
+    
+    # 获取可用 GPU 和 CPU
+    available_gpus = available_resources.get('GPU', 0)
+    available_cpus = available_resources.get('CPU', 1)
+    num_workers = int(available_gpus / gpu_per_worker) if gpu_per_worker > 0 else int(available_cpus)
+    print("num workers:",num_workers)
+
 
     try:
         # 创建输出目录
@@ -100,7 +107,7 @@ def run_inference(data_path, output_path, num_gpus=2, batch_size=4, model_path=N
         # 创建worker
         workers = []
         for i in range(num_workers):
-            worker = create_beats_worker('beats', model_path)
+            worker = create_qwen3omni_worker('Qwen3-Omni-30B-A3B-Instruct', model_path,max_tokens=150)
             workers.append(worker)
 
         logger.info(f"Total GPUs: {num_gpus}, Workers: {num_workers}, GPU per worker: {gpu_per_worker}")
@@ -119,7 +126,8 @@ def run_inference(data_path, output_path, num_gpus=2, batch_size=4, model_path=N
         pbar = tqdm(total=remaining_tasks, desc='Processing samples', unit='sample')
 
         # 分批并行处理
-        chunk_size = num_workers * 8  # 每批处理8倍worker数量的任务
+        chunk_size = num_workers * 80  # 每批处理8倍worker数量的任务
+        # chunk_size = remaining_tasks
         data_iter = iter(data_loader)
 
         while True:
@@ -199,7 +207,7 @@ def run_inference(data_path, output_path, num_gpus=2, batch_size=4, model_path=N
         logger.info(f"Results saved to: {jsonl_path}")
         if enable_sqlite:
             logger.info(f"Progress saved to: {db_path}")
-        logger.info(f"Logs saved to: {log_path}")
+            logger.info(f"Logs saved to: {log_path}")
 
     finally:
         ray.shutdown()
@@ -240,7 +248,7 @@ if __name__ == '__main__':
         data_path=data_path,
         output_path=output_path,
         num_gpus=8,
-        batch_size=4,
+        batch_size=80,
         model_path=model_path,
         enable_sqlite=enable_sqlite,
     )

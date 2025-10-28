@@ -1,6 +1,7 @@
 """
 BEATs模型实现
 """
+
 import logging
 
 import numpy as np

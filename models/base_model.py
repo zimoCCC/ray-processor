@@ -2,6 +2,7 @@
 基础模型类
 定义统一的模型接口
 """
+
 import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Union
